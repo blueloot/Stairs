@@ -8,3 +8,8 @@ export_presets.cfg
 .mono/
 data_*/
 .vscode/
+
+main.tscn
+project.godot
+Stairs.csproj
+Stairs.sln
