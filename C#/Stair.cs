@@ -20,12 +20,12 @@
 /// Note: This class is designed to be used with the Godot Engine and was written in Godot 4.2
 /// </summary>
 /// <author>Blueloot</author>
-/// <version>1.0.0b</version>
+/// <version>1.0.1</version>
 /// <changelog>
 /// performance improvements:
 /// - when updating collision layers, only the collision layers of the stair is updated instead of the entire stair being recreated
-/// - when updating the height, only the height of the stair is updated instead of the entire stair being recreated
-/// TODO: changing width, length, steps, isFloating, isSpiral, spiralAmount, should also be updated in the same way
+/// - when updating the stair dimensions, does not remake the stair, instead only the dimensions of the stair are updated
+/// TODO: changing steps, isFloating, isSpiral, spiralAmount, should also be updated in the same way
 /// </changelog>
 /// <license>CC0 - Public Domain</license>
 
@@ -63,7 +63,7 @@ public partial class Stair : Node3D
 	private int _steps = 10;
 	private bool _isFloating;
 	private bool _isSpiral;
-	private float _spiralAmount = 2f;
+	private float _spiralAmount = 2.04f;
 	private bool _useRamp;
 
 	// Properties
@@ -99,21 +99,21 @@ public partial class Stair : Node3D
 	public float Height
 	{
 		get => _height;
-		set => SetProperty(ref _height, value, DimensionsChanged, UpdateHeight);
+		set => SetProperty(ref _height, value, DimensionsChanged, UpdateDimensions);
 	}
 
 	[ExportGroup("Dimensions"), Export(PropertyHint.Range, "0.01, 50, 0.01, or_greater")]
 	public float Width
 	{
 		get => _width;
-		set => SetProperty(ref _width, value, DimensionsChanged, RemakeStair);
+		set => SetProperty(ref _width, value, DimensionsChanged, UpdateDimensions);
 	}
 
 	[ExportGroup("Dimensions"), Export(PropertyHint.Range, "0.01, 50, 0.01, or_greater")]
 	public float Length
 	{
 		get => _length;
-		set => SetProperty(ref _length, value, DimensionsChanged, RemakeStair);
+		set => SetProperty(ref _length, value, DimensionsChanged, UpdateDimensions);
 	}
 
 	[ExportGroup("Dimensions"), Export(PropertyHint.Range, "1, 50, 1, or_greater")]
@@ -168,50 +168,58 @@ public partial class Stair : Node3D
 		RemakeChildren();
 	}
 
-	private void UpdateHeight()
+	private void UpdateDimensions()
 	{
 		var stepH = Height / Steps;
 		var stepD = Length / Steps;
 		var spiralH = 0.0f;
+		var index = 0;
 
 		foreach (Node child in GetChildren())
 		{
 			if (child is MeshInstance3D mesh)
 			{
-				if (IsFloating)
-				{
-					if (IsSpiral)
-					{
-						float angle = (mesh.GetIndex() - 1) * SpiralAmount * Mathf.Pi / Steps;
-						mesh.Position = new Vector3(
-							Mathf.Cos(angle) * SpiralAmount,
-							(stepH * .5f) + spiralH,
-							Mathf.Sin(angle) * SpiralAmount
-						);
-						spiralH += stepH;
-						mesh.Rotation = new Vector3(0, -angle, 0);
-						mesh.Scale = new Vector3(Width, stepH, stepD * (SpiralAmount + (SpiralAmount * .5f)));
-					}
-					else
-					{
-						mesh.Scale = new Vector3(Width, stepH, stepD);
-						mesh.Position = new Vector3(
-							0,
-							(stepH * .5f) + (stepH * mesh.GetIndex()),
-							(stepD * .5f) + (stepD * mesh.GetIndex())
-						);
-					}
-				}
-				else
-				{
-					mesh.Scale = new Vector3(Width, stepH * (mesh.GetIndex() + 1), stepD);
-					mesh.Position = new Vector3(
-						0,
-						(stepH * .5f) + (stepH * .5f * mesh.GetIndex()),
-						(stepD * .5f) + (stepD * mesh.GetIndex())
-					);
-				}
+				SetDimensionForThisStepIndex(stepH, stepD, ref spiralH, mesh, index);
+				index++;
 			}
+		}
+	}
+
+	// TODO: update ramp as well (CreateCollisionRamp(float stepH, float stepD, int i))
+	private void SetDimensionForThisStepIndex(float stepH, float stepD, ref float spiralH, MeshInstance3D mesh, int i)
+	{
+		if (IsFloating)
+		{
+			if (IsSpiral)
+			{
+				float angle = (i - 1) * SpiralAmount * Mathf.Pi / Steps;
+				mesh.Position = new Vector3(
+					Mathf.Cos(angle) * SpiralAmount,
+					(stepH * .5f) + spiralH,
+					Mathf.Sin(angle) * SpiralAmount
+				);
+				spiralH += stepH;
+				mesh.Rotation = new Vector3(0, -angle, 0);
+				mesh.Scale = new Vector3(Width, stepH, stepD * (SpiralAmount + (SpiralAmount * .5f)));
+			}
+			else
+			{
+				mesh.Scale = new Vector3(Width, stepH, stepD);
+				mesh.Position = new Vector3(
+					0,
+					(stepH * .5f) + (stepH * i),
+					(stepD * .5f) + (stepD * i)
+				);
+			}
+		}
+		else
+		{
+			mesh.Scale = new Vector3(Width, stepH * (i + 1), stepD);
+			mesh.Position = new Vector3(
+				0,
+				(stepH * .5f) + (stepH * .5f * i),
+				(stepD * .5f) + (stepD * i)
+			);
 		}
 	}
 
@@ -259,20 +267,31 @@ public partial class Stair : Node3D
 
 		for (int i = 0; i < Steps; i++)
 		{
-			var mesh = CreateMesh(stepH);
-			var sBody = CreateStaticBody();
-			var cShape = CreateBoxCollisionShape();
-
-			if (IsFloating)
+			var mesh = new MeshInstance3D
 			{
-				HandleFloatingStair(stepH, stepD, ref spiralH, i, mesh);
-			}
-			else
-			{
-				CreateNormalStair(stepH, stepD, i, mesh);
-			}
+				Mesh = new BoxMesh(),
+				Scale = new Vector3(Width, stepH, Length)
+			};
 
-			AddToNodeTree(mesh, sBody, cShape);
+			var sBody = new StaticBody3D
+			{
+				CollisionLayer = CollisionLayer,
+				CollisionMask = CollisionMask
+			};
+
+			var cShape = new CollisionShape3D { Shape = new BoxShape3D() };
+
+			SetDimensionForThisStepIndex(stepH, stepD, ref spiralH, mesh, i);
+
+			AddChild(mesh);
+			mesh.AddChild(sBody);
+			mesh.AddToGroup(CHILD_GROUP);
+			mesh.Owner = Owner;
+			sBody.AddChild(cShape);
+			sBody.AddToGroup(CHILD_GROUP);
+			sBody.Owner = Owner;
+			cShape.AddToGroup(CHILD_GROUP);
+			cShape.Owner = Owner;
 
 			if (UseRamp && !IsSpiral)
 			{
@@ -281,30 +300,14 @@ public partial class Stair : Node3D
 		}
 	}
 
-	private void AddToNodeTree(MeshInstance3D mesh, StaticBody3D sBody, CollisionShape3D cShape)
-	{
-		AddChild(mesh);
-
-		mesh.AddChild(sBody);
-		mesh.AddToGroup(CHILD_GROUP);
-		mesh.Owner = Owner;
-
-		sBody.AddChild(cShape);
-		sBody.AddToGroup(CHILD_GROUP);
-		sBody.Owner = Owner;
-
-		cShape.AddToGroup(CHILD_GROUP);
-		cShape.Owner = Owner;
-	}
-
 	private void CreateCollisionRamp(float stepH, float stepD, int i)
 	{
-		var top = stepH / 2;
-		var btm = -stepH / 2;
-		var left = -Width / 2;
-		var right = Width / 2;
-		var front = stepD / 2;
-		var back = -stepD / 2;
+		var top = stepH * .5f;
+		var btm = -stepH * .5f;
+		var left = -Width * .5f;
+		var right = Width * .5f;
+		var front = stepD * .5f;
+		var back = -stepD * .5f;
 
 		Vector3[] rampVertices =
 		{
@@ -334,75 +337,6 @@ public partial class Stair : Node3D
 
 		rampBody.CollisionLayer = RampCollisionLayer;
 		rampBody.CollisionMask = RampCollisionMask;
-	}
-
-	private void CreateNormalStair(float stepH, float stepD, int i, MeshInstance3D mesh)
-	{
-		mesh.Scale = new Vector3(Width, stepH * (i + 1), stepD);
-		mesh.Position = new Vector3(
-			0,
-			(stepH * .5f) + (stepH * .5f * i),
-			(stepD * .5f) + (stepD * i)
-		);
-	}
-
-	private void HandleFloatingStair(float stepH, float stepD, ref float spiralH, int i, MeshInstance3D mesh)
-	{
-		if (IsSpiral)
-		{
-			CreateSpiralingStair(stepH, stepD, ref spiralH, i, mesh);
-		}
-		else
-		{
-			CreateFloatingStair(stepH, stepD, i, mesh);
-		}
-	}
-
-	private void CreateFloatingStair(float stepH, float stepD, int i, MeshInstance3D mesh)
-	{
-		mesh.Scale = new Vector3(Width, stepH, stepD);
-
-		mesh.Position = new Vector3(
-			0,
-			(stepH * .5f) + (stepH * i),
-			(stepD * .5f) + (stepD * i)
-		);
-	}
-
-	private void CreateSpiralingStair(float stepH, float stepD, ref float spiralH, int i, MeshInstance3D mesh)
-	{
-		float angle = (i - 1) * SpiralAmount * Mathf.Pi / Steps;
-		mesh.Position = new Vector3(
-			Mathf.Cos(angle) * SpiralAmount,
-			(stepH * .5f) + spiralH,
-			Mathf.Sin(angle) * SpiralAmount
-		);
-		spiralH += stepH;
-		mesh.Rotation = new Vector3(0, -angle, 0);
-		mesh.Scale = new Vector3(Width, stepH, stepD * (SpiralAmount + (SpiralAmount * .5f)));
-	}
-
-	private StaticBody3D CreateStaticBody()
-	{
-		return new StaticBody3D
-		{
-			CollisionLayer = CollisionLayer,
-			CollisionMask = CollisionMask
-		};
-	}
-
-	private static CollisionShape3D CreateBoxCollisionShape()
-	{
-		return new CollisionShape3D { Shape = new BoxShape3D() };
-	}
-
-	private MeshInstance3D CreateMesh(float stepHeight)
-	{
-		return new MeshInstance3D
-		{
-			Mesh = new BoxMesh(),
-			Scale = new Vector3(Width, stepHeight, Length)
-		};
 	}
 
 	private void SetProperty<T>(ref T field, T value, Action<Stair, T> eventHandler, Action methodCall)
