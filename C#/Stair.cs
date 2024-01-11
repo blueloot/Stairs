@@ -15,7 +15,8 @@
 /// - Add new Stair nodes to your scene as required.
 /// - Customize the stair properties using the Godot Editor or via scripts.
 /// 
-/// This class emits events for property changes, allowing for responsive design and interaction within the game or application.
+/// This class emits events for property changes, allowing for responsive design and interaction within 
+/// the game or application.
 /// 
 /// Note: This class is designed to be used with the Godot Engine and was written in Godot 4.2
 /// </summary>
@@ -23,8 +24,10 @@
 /// <version>1.0.1</version>
 /// <changelog>
 /// performance improvements:
-/// - when updating collision layers, only the collision layers of the stair is updated instead of the entire stair being recreated
-/// - when updating the stair dimensions, does not remake the stair, instead only the dimensions of the stair are updated
+/// - when updating collision layers, only the collision layers of the stair is updated instead of 
+/// the entire stair being recreated
+/// - when updating the stair dimensions, does not remake the stair, instead only the dimensions of 
+/// the stair are updated
 /// TODO: changing steps, isFloating, isSpiral, spiralAmount, should also be updated in the same way
 /// </changelog>
 /// <license>CC0 - Public Domain</license>
@@ -38,9 +41,10 @@ namespace Blueloot.Stairs;
 [Tool, GlobalClass, Icon("res://icon.svg")]
 public partial class Stair : Node3D
 {
-	public const string GROUP = "STAIRS";
-	public const string CHILD_GROUP = "STAIRS_CHILDREN";
-	public const string CHILD_GROUP_RAMP = "STAIRS_CHILDREN_RAMP";
+	// Constants
+	private const string GROUP = "STAIRS";
+	private const string CHILD_GROUP = "STAIRS_CHILDREN";
+	private const string CHILD_GROUP_RAMP = "STAIRS_CHILDREN_RAMP";
 
 	// Events
 	public event Action<Stair, uint> LayerChanged;
@@ -99,56 +103,56 @@ public partial class Stair : Node3D
 	public float Height
 	{
 		get => _height;
-		set => SetProperty(ref _height, value, DimensionsChanged, UpdateDimensions);
+		set => SetProperty(ref _height, value, DimensionsChanged, UpdateStair);
 	}
 
 	[ExportGroup("Dimensions"), Export(PropertyHint.Range, "0.01, 50, 0.01, or_greater")]
 	public float Width
 	{
 		get => _width;
-		set => SetProperty(ref _width, value, DimensionsChanged, UpdateDimensions);
+		set => SetProperty(ref _width, value, DimensionsChanged, UpdateStair);
 	}
 
 	[ExportGroup("Dimensions"), Export(PropertyHint.Range, "0.01, 50, 0.01, or_greater")]
 	public float Length
 	{
 		get => _length;
-		set => SetProperty(ref _length, value, DimensionsChanged, UpdateDimensions);
+		set => SetProperty(ref _length, value, DimensionsChanged, UpdateStair);
 	}
 
 	[ExportGroup("Dimensions"), Export(PropertyHint.Range, "1, 50, 1, or_greater")]
 	public int Steps
 	{
 		get => _steps;
-		set => SetProperty(ref _steps, value, StepsChanged, RemakeStair);
+		set => SetProperty(ref _steps, value, StepsChanged, InitializeStair);
 	}
 
 	[ExportGroup("Settings"), Export]
 	public bool IsFloating
 	{
 		get => _isFloating;
-		set => SetProperty(ref _isFloating, value, IsFloatingChanged, RemakeStair);
+		set => SetProperty(ref _isFloating, value, IsFloatingChanged, UpdateStair);
 	}
 
 	[ExportGroup("Settings"), Export]
 	public bool IsSpiral
 	{
 		get => _isSpiral;
-		set => SetProperty(ref _isSpiral, value, IsSpiralChanged, RemakeStair);
+		set => SetProperty(ref _isSpiral, value, IsSpiralChanged, UpdateStair);
 	}
 
 	[ExportGroup("Settings"), Export(PropertyHint.Range, "0.01, 50, 0.01, or_greater")]
 	public float SpiralAmount
 	{
 		get => _spiralAmount;
-		set => SetProperty(ref _spiralAmount, value, ChangedSpiralAmount, RemakeStair);
+		set => SetProperty(ref _spiralAmount, value, ChangedSpiralAmount, UpdateStair);
 	}
 
 	[ExportGroup("Settings"), Export]
 	public bool UseRamp
 	{
 		get => _useRamp;
-		set => SetProperty(ref _useRamp, value, UseRampChanged, RemakeStair);
+		set => SetProperty(ref _useRamp, value, UseRampChanged, InitializeStair);
 	}
 
 	// Godot Engine Specific Methods
@@ -157,18 +161,18 @@ public partial class Stair : Node3D
 	{
 		base._Ready();
 		AddToGroup(GROUP);
-		RemakeStair();
+		InitializeStair();
 	}
 
 	// Private Methods
 
-	private void RemakeStair()
+	private void InitializeStair()
 	{
 		ClearChildren();
-		RemakeChildren();
+		BuildStairStructure();
 	}
 
-	private void UpdateDimensions()
+	private void UpdateStair()
 	{
 		var stepH = Height / Steps;
 		var stepD = Length / Steps;
@@ -210,6 +214,7 @@ public partial class Stair : Node3D
 					(stepH * .5f) + (stepH * i),
 					(stepD * .5f) + (stepD * i)
 				);
+				mesh.Rotation = new Vector3(0, 0, 0);
 			}
 		}
 		else
@@ -220,6 +225,7 @@ public partial class Stair : Node3D
 				(stepH * .5f) + (stepH * .5f * i),
 				(stepD * .5f) + (stepD * i)
 			);
+			mesh.Rotation = new Vector3(0, 0, 0);
 		}
 	}
 
@@ -259,7 +265,7 @@ public partial class Stair : Node3D
 		foreach (Node child in GetChildren()) child.QueueFree();
 	}
 
-	private void RemakeChildren()
+	private void BuildStairStructure()
 	{
 		var stepH = Height / Steps;
 		var stepD = Length / Steps;
