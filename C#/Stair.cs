@@ -24,11 +24,9 @@
 /// <version>1.0.1</version>
 /// <changelog>
 /// performance improvements:
-/// - when updating collision layers, only the collision layers of the stair is updated instead of 
-/// the entire stair being recreated
-/// - when updating the stair dimensions, does not remake the stair, instead only the dimensions of 
-/// the stair are updated
-/// TODO: changing steps, isFloating, isSpiral, spiralAmount, should also be updated in the same way
+/// - when making changes to the stair, only the affected steps are updated instead of a full rebuild
+/// TODO: improve performance on "changing step count" by only adding/removing steps as needed
+/// TODO: update ramp as well (CreateCollisionRamp(float stepH, float stepD, int i))
 /// </changelog>
 /// <license>CC0 - Public Domain</license>
 
