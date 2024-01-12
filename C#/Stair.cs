@@ -53,8 +53,10 @@ public partial class Stair : Node3D
 	public event Action<Stair, bool> IsSpiralChanged;
 	public event Action<Stair, float> ChangedSpiralAmount;
 	public event Action<Stair, bool> UseRampChanged;
+	public event Action<Stair, BaseMaterial3D> MaterialChanged;
 
 	// Fields
+	private BaseMaterial3D _material;
 	private uint _collisionLayer = 0b1;
 	private uint _collisionMask = 0b1;
 	private uint _rampCollisionLayer = 0b1;
@@ -69,6 +71,13 @@ public partial class Stair : Node3D
 	private bool _useRamp;
 
 	// Properties
+	[ExportGroup("Appearance"), Export]
+	public BaseMaterial3D Material
+	{
+		get => _material;
+		set => SetProperty(ref _material, value, MaterialChanged, UpdateMaterial);
+	}
+
 	[ExportGroup("Collision Info"), Export(PropertyHint.Layers3DPhysics)]
 	public uint CollisionLayer
 	{
@@ -185,9 +194,51 @@ public partial class Stair : Node3D
 				index++;
 			}
 		}
+
+		index = 0;
+		if (UseRamp && !IsSpiral)
+		{
+			foreach (Node child in GetChildren())
+			{
+				if (child is StaticBody3D rampBody)
+				{
+					rampBody.Position = new Vector3(0, (stepH * .5f) + stepH * index, (stepD * .5f) + stepD * index);
+
+					var top = stepH * .5f;
+					var btm = -stepH * .5f;
+					var left = -Width * .5f;
+					var right = Width * .5f;
+					var front = stepD * .5f;
+					var back = -stepD * .5f;
+
+					Vector3[] rampVertices =
+					{
+						new(left, btm, back-stepD),
+						new(left, top, back),
+						new(right, btm, back-stepD),
+						new(right, top, back)
+					};
+
+					(rampBody.GetChild<CollisionShape3D>(0).Shape as ConvexPolygonShape3D).Points = rampVertices;
+
+					index++;
+				}
+			}
+		}
 	}
 
-	// TODO: update ramp as well (CreateCollisionRamp(float stepH, float stepD, int i))
+
+	private void UpdateMaterial()
+	{
+		foreach (Node child in GetChildren())
+		{
+			if (child is MeshInstance3D mesh)
+			{
+				mesh.MaterialOverride = Material;
+			}
+		}
+	}
+
 	private void SetDimensionForThisStepIndex(float stepH, float stepD, ref float spiralH, MeshInstance3D mesh, int i)
 	{
 		if (IsFloating)
@@ -302,6 +353,8 @@ public partial class Stair : Node3D
 				CreateCollisionRamp(stepH, stepD, i);
 			}
 		}
+
+		UpdateMaterial();
 	}
 
 	private void CreateCollisionRamp(float stepH, float stepD, int i)
