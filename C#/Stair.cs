@@ -25,10 +25,11 @@
 /// <changelog>
 /// performance improvements:
 /// - when making changes to the stair, only the affected steps are updated instead of a full rebuild
-/// TODO: improve performance on "changing step count" by only adding/removing steps as needed
-/// TODO: update ramp as well (CreateCollisionRamp(float stepH, float stepD, int i))
 /// </changelog>
 /// <license>CC0 - Public Domain</license>
+/// <url>https://github.com/blueloot/Stairs/blob/main/C%23/Stair.cs</url>
+
+// TODO: improve performance on "changing step count" by only adding/removing steps as needed
 
 using Godot;
 using System;
