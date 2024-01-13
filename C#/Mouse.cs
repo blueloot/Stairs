@@ -23,20 +23,14 @@ using Godot;
 
 public static class Mouse
 {
-    private const float DoubleClickThreshold = 0.3f; // Threshold time for double click detection.
-    private static int LastClickedIndex { get; set; } = -1; // Index of the last clicked UI element.
-    private static float LastClickTime { get; set; } = 0f; // Time of the last click event.
-    private static MouseButton LastButtonClicked { get; set; } = MouseButton.None; // Last clicked mouse button.
-    private static Input.MouseModeEnum CurrentMode => Input.MouseMode; // Current mouse mode.
-
     /// <returns>true if the mouse cursor is visible; otherwise, false.</returns>
-    public static bool IsVisible => CurrentMode == Input.MouseModeEnum.Visible;
+    public static bool IsVisible => Input.MouseMode == Input.MouseModeEnum.Visible;
 
     /// <returns>true if the mouse cursor is captured; otherwise, false.</returns>
-    public static bool IsHidden => CurrentMode == Input.MouseModeEnum.Captured;
+    public static bool IsHidden => Input.MouseMode == Input.MouseModeEnum.Captured;
 
     /// <returns>true if the mouse cursor is disabled; otherwise, false.</returns>
-    public static bool IsDisabled => CurrentMode == Input.MouseModeEnum.Hidden;
+    public static bool IsDisabled => Input.MouseMode == Input.MouseModeEnum.Hidden;
 
     /// <summary>Shows the mouse cursor.</summary>
     public static void Show() => Input.MouseMode = Input.MouseModeEnum.Visible;
@@ -54,6 +48,18 @@ public static class Mouse
     /// <param name="index">The index of the item to check for a double click, default is -1 (anywhere).</param>
     /// <returns>true if a double click was recognized; otherwise, false.</returns>
     public static bool DoubleClicked(MouseButton mouseButton = MouseButton.Left, int index = -1)
+    => MouseExtensions.DoubleClicked(mouseButton, index);
+}
+
+internal static class MouseExtensions
+{
+    private const float DoubleClickThreshold = 0.3f; // Threshold time for double click detection.
+
+    private static int LastClickedIndex { get; set; } = -1; // Index of the last clicked UI element.
+    private static float LastClickTime { get; set; } = 0f; // Time of the last click event.
+    private static MouseButton LastButtonClicked { get; set; } = MouseButton.None; // Last clicked mouse button. 
+
+    internal static bool DoubleClicked(MouseButton mouseButton = MouseButton.Left, int index = -1)
     {
         if (IsMouseButtonPressedWithCondition(mouseButton, index) && IsWithinDoubleClickThreshold())
         {
@@ -64,6 +70,7 @@ public static class Mouse
         UpdateClickInfo(mouseButton, index);
         return false;
 
+        // local functions
         bool IsMouseButtonPressedWithCondition(MouseButton mouseButton, int index)
             => Input.IsMouseButtonPressed(mouseButton) &&
                LastButtonClicked == mouseButton &&
