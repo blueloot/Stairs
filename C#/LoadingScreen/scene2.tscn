@@ -1,4 +1,6 @@
-[gd_scene format=3 uid="uid://3xvh3adjb2j7"]
+[gd_scene load_steps=2 format=3 uid="uid://3xvh3adjb2j7"]
+
+[ext_resource type="Texture2D" uid="uid://dgq8t725wth5j" path="res://icon.svg" id="1_cdxu2"]
 
 [node name="Scene2" type="Control"]
 layout_mode = 3
@@ -7,3 +9,27 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+
+[node name="Icon" type="Sprite2D" parent="."]
+position = Vector2(843, 474)
+texture = ExtResource("1_cdxu2")
+
+[node name="Icon2" type="Sprite2D" parent="."]
+position = Vector2(381, 420)
+texture = ExtResource("1_cdxu2")
+
+[node name="Icon3" type="Sprite2D" parent="."]
+position = Vector2(759, 143)
+texture = ExtResource("1_cdxu2")
+
+[node name="Icon4" type="Sprite2D" parent="."]
+position = Vector2(331, 227)
+texture = ExtResource("1_cdxu2")
+
+[node name="Icon5" type="Sprite2D" parent="."]
+position = Vector2(179, 519)
+texture = ExtResource("1_cdxu2")
+
+[node name="Icon6" type="Sprite2D" parent="."]
+position = Vector2(666, 412)
+texture = ExtResource("1_cdxu2")

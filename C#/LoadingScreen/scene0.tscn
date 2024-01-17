@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3 uid="uid://dd33c1o5hbvnm"]
+
+[ext_resource type="PackedScene" uid="uid://djd1oj34hf161" path="res://C#/LoadingScreen/scene1.tscn" id="1_nbwso"]
+
+[node name="Scene0" type="Node"]
+
+[node name="Scene1" parent="." instance=ExtResource("1_nbwso")]
