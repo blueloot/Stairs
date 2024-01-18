@@ -44,9 +44,9 @@ In this example, when the button is pressed, the specified new scene is loaded.
 
 The `ReplaceRoot` property in `SceneManager` determines how the scene transition is handled:
 
-* `ReplaceRoot = true`: The entire root node is replaced with the loading screen, and subsequently with the new scene. This is suitable for simple games where each scene is independent.
+- `ReplaceRoot = true`: The entire root node is replaced with the loading screen, and subsequently with the new scene. This is suitable for simple games where each scene is independent.
 
-* `ReplaceRoot = false`: The loading screen is added as a child to the current scene's root. After loading, the new scene is also added as a child. This is useful when you have a persistent `GameManager` or similar node that should remain throughout the game.
+- `ReplaceRoot = false`: The loading screen is added as a child to the current scene's root. After loading, the new scene is also added as a child. This is useful when you have a persistent `GameManager` or similar node that should remain throughout the game.
 
 Example with `GameManager` as Root
 Set `ReplaceRoot` to `false`:
