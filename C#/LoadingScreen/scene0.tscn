@@ -4,4 +4,6 @@
 
 [node name="Scene0" type="Node"]
 
+[node name="Node" type="Node" parent="."]
+
 [node name="Scene1" parent="." instance=ExtResource("1_nbwso")]
