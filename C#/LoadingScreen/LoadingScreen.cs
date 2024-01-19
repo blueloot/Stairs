@@ -19,17 +19,20 @@
 ///
 /// </summary>
 /// <author>Blueloot</author>
-/// <version>1.0</version>
+/// <version>1.0.1</version>
 /// <target>Godot 4.2.stable.mono</target>
 /// <changelog>
-/// - 1.0: Initial release, featuring basic scene transition functionality with loading screen.
+/// - 1.0.1: Improved documentation
+/// - 1.0.0: Initial release, featuring basic scene transition functionality with loading screen.
 /// </changelog>
 /// <license>CC0 - Public Domain</license>
 /// <url>https://github.com/blueloot/Stairs/tree/main/C%23/LoadingScreen</url>
 ///
 /// TODO: 
-///  - proper fade in/out even when the "ReplaceRoot" option is true, if possible.
-///  - remove the hack to get the current scene
+///  - proper fade in/out even when the "ReplaceRootNodeOnLoad" option is true, if possible.
+///  - support parent scenes. currently only supports children of the root node (or the root node itself).
+///    basically to support cases where a scene should be loaded as a child of another scene.
+///  - support sceneloading without deleting the current scene.
 
 using System.Threading.Tasks;
 using Godot;
@@ -47,10 +50,27 @@ public static class SceneManager
 	public static readonly bool UseSubThreads = true;
 
 	// Option to replace the root node with the loader scene or not.
-	public static bool ReplaceRoot { get; set; } = false;
+	// if false: the loader will be added as a child of root. leaving the root node and its children intact.
+	//           this means in order to delete the correct scene/level you need to previously set the
+	// 		 	 ActiveScene property to the scene you want to delete. this only applies for the first scene
+	//			 loaded, after that the ActiveScene property will be set automatically.
+	// if true: the loader will replace the root node. the root node will be deleted.
+	//			simplest option, but good for simple non-complex games that doesn't deal
+	//			with a lot of data or are in-scene-contained.
+	public static bool ReplaceRootNodeOnLoad { get; set; } = false;
+	public static void SetReplaceRootMode(bool value) => ReplaceRootNodeOnLoad = value;
 
-	// Reference to the currently active scene (excluding the loading screen and root node).
-	public static Node ActiveScene = null;
+	// Reference to the currently active scene (the scene to delete).
+	private static Node activeScene = null;
+	public static Node ActiveScene
+	{
+		get => activeScene;
+		set
+		{
+			activeScene = value;
+			activeScene.AddToGroup("QueueFree");
+		}
+	}
 
 	// Path to the next scene to be loaded.
 	public static string NextScenePath { get; private set; } = "";
@@ -72,15 +92,10 @@ public static class SceneManager
 		}
 
 		Node loaderNode = loaderScene?.Instantiate();
-		if (loaderNode == null)
-		{
-			GD.PrintErr("Failed to instantiate loader scene");
-			return;
-		}
 
 		// Replace the current scene with the loader scene.
 		// or add the loader scene as a child of the current scene.
-		if (ReplaceRoot)
+		if (ReplaceRootNodeOnLoad)
 		{
 			var currentScene = GetTree().CurrentScene;
 
@@ -104,21 +119,28 @@ public partial class LoadingScreen : CanvasLayer
 	private enum Status { Idle, LoadNewScene, Hide, Finish }
 	private Status status = Status.Idle;
 
-	// Flag to ensure the scene is loaded only once when SceneManager.ReplaceRoot is false
-	private bool isLoaded = false;
-
 	public override void _Ready()
 	{
-		// TODO: this is a hack to get the current scene
+		// this is a hack to get the current scene, but,
 		// it is not a reliable way since the scene could be in another position in the tree
-		if (SceneManager.ActiveScene == null)
+		// instead the scene should either be passed as an argument for SceneManager.Load, 
+		// or set during the scene's _Ready method (see scene1.cs for an example)
+		if (SceneManager.ActiveScene == null
+		&& !SceneManager.ReplaceRootNodeOnLoad)
 		{
 			SceneManager.ActiveScene = GetTree().CurrentScene.GetChild(0);
-			SceneManager.ActiveScene.AddToGroup("QueueFree");
+			GD.PrintRich($"[color=#1E90FF]LoadingScreen.cs[/color] : " +
+						 $"[color=#FF4136]Warning:[/color] " +
+						 $"[color=#FFDC00]SceneManager.ActiveScene[/color] is not set. " +
+						 $"Defaulting to the first child '[color=#2ECC40]{SceneManager.ActiveScene?.Name}'[/color]' of the current scene. " +
+						 $"[color=#7FDBFF]Caution: This might not be the intended scene![/color] " +
+						 $"Set [color=#FFDC00]SceneManager.ActiveScene[/color] manually before the first scene load to ensure correct scene management. " +
+						 $"Typically done in a GameManager or similar. " +
+						 $"[color=#FF851B]Note: This is only critical for the first load, as SceneManager will handle subsequent loads automatically.[/color]");
 		}
 
 		// Start the fade-in animation and prepare to load the new scene.
-		FadeIn().ContinueWith(_ => status = Status.LoadNewScene);
+		PlayAndWaitAnimation("fade_in").ContinueWith(_ => status = Status.LoadNewScene);
 		ResourceLoader.LoadThreadedRequest(SceneManager.NextScenePath, "", SceneManager.UseSubThreads);
 	}
 
@@ -133,9 +155,10 @@ public partial class LoadingScreen : CanvasLayer
 				break;
 
 			case Status.Hide:
-				// Preload the new scene if applicable and start the fade-out process.
+				// gradually show the new scene by fading out the loading screen.
 				PreloadNewScene();
-				await FadeOut().ContinueWith(_ => status = Status.Finish);
+				await PlayAndWaitAnimation("fade_in", true);
+				status = Status.Finish;
 				break;
 
 			case Status.Finish:
@@ -147,22 +170,20 @@ public partial class LoadingScreen : CanvasLayer
 
 	private void PreloadNewScene()
 	{
-		// Ensure the new scene is loaded and added only once.
-		if (!isLoaded && !SceneManager.ReplaceRoot)
+		if (!SceneManager.ReplaceRootNodeOnLoad)
 		{
-			isLoaded = true;
 			var scene = ResourceLoader.LoadThreadedGet(SceneManager.NextScenePath) as PackedScene;
-			var newScene = scene.Instantiate();
+			var newScene = scene?.Instantiate();
+			if (newScene == null) return;
 			GetTree().CurrentScene.AddChild(newScene);
 			SceneManager.ActiveScene = newScene;
-			SceneManager.ActiveScene.AddToGroup("QueueFree");
 		}
 	}
 
 	private void Finish()
 	{
 		// Change to the new scene or remove the loading screen based on configuration.
-		if (SceneManager.ReplaceRoot)
+		if (SceneManager.ReplaceRootNodeOnLoad)
 		{
 			var scene = ResourceLoader.LoadThreadedGet(SceneManager.NextScenePath) as PackedScene;
 			GetTree().ChangeSceneToPacked(scene);
@@ -196,7 +217,7 @@ public partial class LoadingScreen : CanvasLayer
 
 
 	// Helper methods for animations.
-	private AnimationPlayer PlayAnim(string animation, bool backwards = false)
+	private AnimationPlayer PlayAnimation(string animation, bool backwards = false)
 	{
 		var anim = GetNodeOrNull<AnimationPlayer>("AnimationPlayer");
 		if (backwards) anim?.PlayBackwards(animation);
@@ -204,16 +225,9 @@ public partial class LoadingScreen : CanvasLayer
 		return anim;
 	}
 
-	public async Task FadeIn()
+	public async Task PlayAndWaitAnimation(string animation, bool backwards = false)
 	{
-		var anim = PlayAnim("fade_in");
-		if (anim == null) return;
-		await ToSignal(anim, "animation_finished");
-	}
-
-	public async Task FadeOut()
-	{
-		var anim = PlayAnim("fade_in", true);
+		var anim = PlayAnimation(animation, backwards);
 		if (anim == null) return;
 		await ToSignal(anim, "animation_finished");
 	}
